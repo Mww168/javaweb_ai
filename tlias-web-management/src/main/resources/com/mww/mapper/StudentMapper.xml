@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mww.mapper.StudentMapper">
+    <insert id="insert">
+        insert into student (name, no, gender, phone, degree, clazz_id, id_card, is_college, address, graduation_date,
+        create_time, update_time)
+        values (#{name}, #{no}, #{gender}, #{phone}, #{degree}, #{clazzId}, #{idCard}, #{isCollege}, #{address},
+        #{graduationDate}, #{createTime}, #{updateTime})
+    </insert>
+    <update id="update">
+        update student
+        <set>
+            <if test="name != null and name != ''">
+                name = #{name},
+            </if>
+            <if test="no != null and no != ''">
+                no = #{no},
+            </if>
+            <if test="gender != null and gender != ''">
+                gender = #{gender},
+            </if>
+            <if test="phone != null and phone != ''">
+                phone = #{phone},
+            </if>
+            <if test="degree != null and degree != ''">
+                degree = #{degree},
+            </if>
+            <if test="idCard != null and idCard != ''">
+                id_card = #{idCard},
+            </if>
+            <if test="isCollege != null">
+                is_college = #{isCollege},
+            </if>
+            <if test="address != null and address != ''">
+                address = #{address},
+            </if>
+            <if test="graduationDate != null">
+                graduation_date = #{graduationDate},
+            </if>
+            <if test="violationCount != null">
+                violation_count = #{violationCount},
+            </if>
+            <if test="violationScore != null">
+                violation_score = #{violationScore},
+            </if>
+            <if test="clazzId != null">
+                clazz_id = #{clazzId},
+            </if>
+            update_time = #{updateTime}
+        </set>
+        where id = #{id}
+    </update>
+    <update id="violation">
+        update student
+        set violation_count = violation_count + 1,
+        violation_score = violation_score + #{score}
+        where id = #{id}
+    </update>
+    <delete id="deleteBatchIds">
+        delete from student where id in
+        <foreach item="id" collection="ids" separator="," open="(" close=")">
+            #{id}
+        </foreach>
+    </delete>
+    <select id="countStudentDegreeData" resultType="java.util.Map">
+        select
+        if(degree = 1 , '初中', if(degree = 2, '高中', if(degree = 3, '大专', if(degree = 4, '本科', if(degree = 5,
+        '硕士',if(degree = 6, '博士','其他')))))) name,
+        count(*) value
+        from student group by degree;
+    </select>
+
+    <select id="list" resultType="com.mww.pojo.Student">
+        select s.id,
+        s.name,
+        s.no,
+        s.gender,
+        s.phone,
+        s.degree,
+        s.id_card as idCard,
+        s.is_college as isCollege,
+        s.address,
+        s.graduation_date as graduationDate,
+        s.violation_count as violationCount,
+        s.violation_score as violationScore,
+        s.clazz_id as clazzId,
+        c.name as clazzName,
+        s.create_time as createTime,
+        s.update_time as updateTime
+        from student s
+        left join clazz c on s.clazz_id = c.id
+        <where>
+            <if test="name != null and name != ''">
+                and s.name like concat('%', #{name}, '%')
+            </if>
+            <if test="degree != null and degree != ''">
+                and s.degree = #{degree}
+            </if>
+            <if test="clazzId != null and clazzId != ''">
+                and s.clazz_id = #{clazzId}
+            </if>
+
+        </where>
+        order by s.update_time desc
+    </select>
+    <select id="getById" resultType="com.mww.pojo.Student">
+        select s.id,
+        s.name,
+        s.no,
+        s.gender,
+        s.phone,
+        s.degree,
+        s.id_card as idCard,
+        s.is_college as isCollege,
+        s.address,
+        s.graduation_date as graduationDate,
+        s.violation_count as violationCount,
+        s.violation_score as violationScore,
+        s.clazz_id as clazzId,
+        c.name as clazzName,
+        s.create_time as createTime,
+        s.update_time as updateTime
+        from student s
+        left join clazz c on s.clazz_id = c.id
+        where s.id = #{id}
+    </select>
+    <select id="countStudentCountData" resultType="java.util.Map">
+        select (case when clazz_id = 1 then 'Java开发'
+        when clazz_id = 2 then '大数据就业58期'
+        when clazz_id = 3 then 'JavaEE就业166期'
+        when clazz_id = 4 then 'JavaEE就业165期'
+        when clazz_id = 5 then '前端就业90期'
+        when clazz_id = 6 then 'JavaEE就业163期'
+        when clazz_id = 7 then '数学'
+        when clazz_id = 8 then 'C语言教程'
+        else '其他' end) clazz ,
+        count(*) num
+        from student group by clazz_id order by clazz
+    </select>
+</mapper>

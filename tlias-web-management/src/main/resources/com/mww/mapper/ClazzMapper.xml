@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mww.mapper.ClazzMapper">
+    <insert id="insert">
+        insert into clazz (name, room, begin_date, end_date, master_id, subject,create_time, update_time,status)
+        values (#{name}, #{room}, #{beginDate}, #{endDate}, #{masterId}, #{subject},#{createTime},#{updateTime},#{status});
+    </insert>
+    <update id="update">
+        update clazz set name = #{name},room = #{room},begin_date = #{beginDate},end_date = #{endDate},master_id = #{masterId},subject = #{subject},create_time = #{createTime},update_time = #{updateTime},status = #{status}
+        where id = #{id}
+    </update>
+    <delete id="delete">
+        delete from clazz where id = #{id} ;
+    </delete>
+
+    <select id="select" resultType="com.mww.pojo.Clazz">
+        select c.id,
+        c.name,
+        c.room,
+        c.begin_date,
+        c.end_date,
+        c.master_id,
+        e.name as master_name,
+        c.create_time,
+        c.update_time,
+        case
+        when c.end_date   &lt; curdate() then '已结课'
+        when c.begin_date &gt; curdate() then '未开班'
+        else '在读'
+        end as status
+        from clazz c
+        left join emp e on c.master_id = e.id
+        <where>
+            <if test="name != null and name != ''">
+                and c.name like concat('%', #{name}, '%')
+            </if>
+            <if test="begin != null">
+                and c.begin_date &gt;= #{begin}
+            </if>
+            <if test="end != null">
+                and c.end_date &lt;= #{end}
+            </if>
+        </where>
+        order by c.update_time desc
+    </select>
+    <select id="selectById" resultType="com.mww.pojo.Clazz">
+        select c.id,
+        c.name,
+        c.room,
+        c.begin_date,
+        c.end_date,
+        c.master_id,
+        c.subject,
+        c.create_time,
+        c.update_time
+        from clazz c
+        left join emp e on c.master_id = e.id
+        where c.id = #{id}
+    </select>
+    <select id="selectAll" resultType="com.mww.pojo.Clazz">
+        select c.id,
+        c.name,
+        c.room,
+        c.begin_date,
+        c.end_date,
+        c.master_id,
+        e.name as master_name,
+        c.create_time,
+        c.update_time,
+        c.status
+        from clazz c
+        left join emp e on c.master_id = e.id
+        order by c.update_time desc
+    </select>
+
+</mapper>

@@ -1,0 +1,30 @@
+# Java / Maven build output
+**/target/
+**/out/
+**/gen/
+*.class
+*.jar
+*.war
+
+# Runtime logs
+*.log
+logs/
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+**/application-local.yml
+**/application-local.yaml
+**/application-dev-local.yml
+**/application-dev-local.yaml
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+Desktop.ini

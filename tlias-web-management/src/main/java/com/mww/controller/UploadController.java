@@ -1,5 +1,6 @@
 package com.mww.controller;
 
+import com.mww.anno.RateLimit;
 import com.mww.pojo.Result;
 import com.mww.utils.AliyunOSSOperator;
 import lombok.extern.slf4j.Slf4j;
@@ -35,6 +36,11 @@ public class UploadController {
 
     @Autowired
     private AliyunOSSOperator aliyunOSSOperator;
+
+    /**
+     * 上传：按 IP 限流，防止被刷存储费用。
+     */
+    @RateLimit(key = "upload", permits = 20, windowSeconds = 60, message = "上传过于频繁，请稍后再试")
     @PostMapping("/upload")
     public Result upload(MultipartFile file) throws Exception {
         log.info("文件上传:{}", file.getOriginalFilename());

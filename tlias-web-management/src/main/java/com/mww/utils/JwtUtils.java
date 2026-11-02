@@ -8,6 +8,7 @@ import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.Map;
+import java.util.UUID;
 
 public class JwtUtils {
 
@@ -20,7 +21,9 @@ public class JwtUtils {
     public static String generateJwt(Map<String, Object> claims) {
         return Jwts.builder()
                 .setClaims(claims)
-                .setExpiration(new Date(System.currentTimeMillis() + 3600 * 1000)) // 1小时
+                // jti：给每个 token 一个唯一 ID，登出时按它写黑名单（JWT 本身无状态，靠 jti 才能定点失效）
+                .setId(UUID.randomUUID().toString())
+                .setExpiration(new Date(System.currentTimeMillis() + 3600 * 1000))
                 .signWith(SECRET_KEY, SignatureAlgorithm.HS256) // 使用 Key 对象签名
                 .compact();
     }

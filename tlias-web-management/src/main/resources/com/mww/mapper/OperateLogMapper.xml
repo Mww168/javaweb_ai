@@ -19,4 +19,15 @@
         ORDER BY l.operate_time DESC
     </select>
 
+    <!-- 批量插入：异步消费者一次写入多条，避免逐条 insert 的 N 次往返 -->
+    <insert id="insertBatch">
+        insert into operate_log
+        (operate_emp_id, operate_time, class_name, method_name, method_params, return_value, cost_time)
+        values
+        <foreach collection="logs" item="log" separator=",">
+            (#{log.operateEmpId}, #{log.operateTime}, #{log.className}, #{log.methodName},
+            #{log.methodParams}, #{log.returnValue}, #{log.costTime})
+        </foreach>
+    </insert>
+
 </mapper>

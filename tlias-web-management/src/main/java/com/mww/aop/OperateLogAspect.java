@@ -1,11 +1,8 @@
 package com.mww.aop;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.mww.anno.OperateLog;
+import com.mww.common.JsonUtils;
+import com.mww.common.RedisKeys;
 import com.mww.mapper.OperateLogMapper;
 import com.mww.pojo.Log;
 import com.mww.utils.CurrentHolder;
@@ -17,6 +14,7 @@ import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.reflect.MethodSignature;
 import org.springframework.aop.support.AopUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.validation.BindingResult;
@@ -48,16 +46,14 @@ public class OperateLogAspect {
     /** 数据库字段长度限制 */
     private static final int MAX_LENGTH = 2000;
 
-    /** 独立的 ObjectMapper，避免序列化 LocalDateTime 等类型报错 */
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
-            .registerModule(new JavaTimeModule())
-            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
-            .disable(SerializationFeature.FAIL_ON_EMPTY_BEANS)
-            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
-            .setSerializationInclusion(JsonInclude.Include.NON_NULL);
-
     @Autowired
     private OperateLogMapper operateLogMapper;
+
+    @Autowired
+    private StringRedisTemplate redisTemplate;
+
+    /** 队列积压上限：超过后不再入队，改为同步写库，避免 Redis 内存被日志撑爆 */
+    private static final long MAX_QUEUE_SIZE = 10_000L;
 
     /**
      * 切点：com.mww.controller 包及其子包下的所有方法
@@ -89,11 +85,40 @@ public class OperateLogAspect {
             long costTime = System.currentTimeMillis() - begin;
             try {
                 Log operateLog = buildLog(joinPoint, method, result, costTime, exception);
-                operateLogMapper.insert(operateLog);
+                // 优先投递到 Redis 队列，由 OperateLogConsumer 异步批量落库：
+                // 请求线程只做一次 LPUSH，不再承担 DB 写入的 IO 开销
+                if (!pushToQueue(operateLog)) {
+                    // Redis 不可用 / 队列已满：降级为同步写库，保证日志不丢
+                    operateLogMapper.insert(operateLog);
+                }
             } catch (Exception e) {
                 // 记录日志失败不能影响主业务
                 log.error("保存操作日志失败", e);
             }
+        }
+    }
+
+    /**
+     * 把日志投递到 Redis 队列。
+     *
+     * @return true 入队成功；false 需要调用方降级同步写库
+     */
+    private boolean pushToQueue(Log operateLog) {
+        String json = JsonUtils.toJson(operateLog);
+        if (json == null) {
+            return false;
+        }
+        try {
+            Long queueSize = redisTemplate.opsForList().size(RedisKeys.OPERATE_LOG_QUEUE);
+            if (queueSize != null && queueSize >= MAX_QUEUE_SIZE) {
+                log.warn("操作日志队列积压 {} 条，降级为同步写库", queueSize);
+                return false;
+            }
+            redisTemplate.opsForList().leftPush(RedisKeys.OPERATE_LOG_QUEUE, json);
+            return true;
+        } catch (Exception e) {
+            log.warn("操作日志入队失败，降级为同步写库: {}", e.getMessage());
+            return false;
         }
     }
 
@@ -232,15 +257,8 @@ public class OperateLogAspect {
      * 对象转 JSON 字符串
      */
     private String toJson(Object obj) {
-        if (obj == null) {
-            return null;
-        }
-        try {
-            return OBJECT_MAPPER.writeValueAsString(obj);
-        } catch (Exception e) {
-            // 序列化失败时降级处理，避免影响日志记录
-            return String.valueOf(obj);
-        }
+        // 统一走 JsonUtils，保证切面、缓存、队列三处序列化口径一致
+        return JsonUtils.toJson(obj);
     }
 
     /**

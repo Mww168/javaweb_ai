@@ -9,6 +9,15 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHander {
+    /**
+     * 业务异常：message 是给用户看的，直接回显，不需要打印堆栈。
+     */
+    @ExceptionHandler
+    public Result handleBusinessException(BusinessException e) {
+        log.warn("业务校验未通过: {}", e.getMessage());
+        return Result.error(e.getMessage());
+    }
+
     @ExceptionHandler
     public Result handleException(Exception e) {
         log.error("程序出错了:",e);
